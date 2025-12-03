@@ -1,7 +1,8 @@
 plugins {
-    id 'java'
-    id 'org.springframework.boot' version '3.2.4' //apply false
-    id 'io.spring.dependency-management' version '1.1.4' //apply false
+    id 'java' // 도구 사용을 위해 루트에 적용(하위 프로젝트도 필요에 따라 Java를 적용함)
+    id 'org.springframework.boot' version "${springBootVersion}" apply false
+    id 'io.spring.dependency-management' version "${dependencyManagementVersion}" apply false
+    id 'com.github.ben-manes.versions' version '0.46.0' apply false
 }
 
 group = 'com.msa'
@@ -10,7 +11,7 @@ description = 'monorepo'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(Integer.parseInt(property('javaVersion') as String))
     }
 }
 
@@ -18,69 +19,63 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    // Spring Boot starters
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-//    implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-
-    // Swagger
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
-
-    // Lombok
-    annotationProcessor 'org.projectlombok:lombok'
-    compileOnly 'org.projectlombok:lombok'
-    testAnnotationProcessor 'org.projectlombok:lombok'
-    testCompileOnly 'org.projectlombok:lombok'
-
-    // MapStruct
-    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
-    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
-    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
-
-    // Devtools
-//    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-
-    // MariaDB client
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
-
-//    // MySqlDB client
-//    runtimeOnly 'com.mysql:mysql-connector-j:8.2.0'
-
-    // Test
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-//    testImplementation 'org.springframework.security:spring-security-test'
-
-    // P6Spy
-    implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.2'
-
-    // AOP
-    implementation 'org.springframework.boot:spring-boot-starter-aop'
-
-    // QueryDSL
-    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
-    implementation 'com.querydsl:querydsl-apt:5.0.0:jakarta'
-    annotationProcessor 'com.querydsl:querydsl-apt:5.0.0:jakarta'
-    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
-    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
-
-    // JWT
-    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
-    implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
-    implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
-
-    // Spring WebFlux
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
-
-    // SQLite
-//    implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
-//    implementation 'org.hibernate.orm:hibernate-community-dialects:6.3.1.Final'
-
-    // Spring WebSocket
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+// 프로젝트 전반에서 사용할 수 있는 추가 속성 정의
+ext {
+    mapstructVersion = property('mapstructVersion')
+    jjwtVersion = property('jjwtVersion')
+    p6spyVersion = property('p6spyVersion')
+    querydslVersion = property('querydslVersion')
+    springdocVersion = property('springdocVersion')
+    lombokVersion = property('lombokVersion')
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
+// 하위 프로젝트에 공통으로 적용할 설정 정의
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+
+    group = rootProject.group
+    version = rootProject.version
+
+    repositories {
+        mavenCentral()
+    }
+
+    // 공통으로 사용할 compileOnly/annotationProcessor (Lombok 관련)
+    dependencies {
+        compileOnly libs.lombok
+        annotationProcessor libs.lombok
+    }
+
+    // 컴파일 시점의 의존성 구성을 정의
+    configurations {
+        compileOnly {
+            extendsFrom annotationProcessor
+        }
+    }
+
+    // Spring Boot BOM을 dependencyManagement로 import (버전 일관성 유지)
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:${property('springBootVersion')}"
+        }
+    }
+
+//    tasks.withType(Test) {
+//        useJUnitPlatform()
+//    }
+
+    // 실행 시 현재 모듈의 이름과 그룹, 버전을 출력
+    tasks.register('printModule') {
+        doLast {
+            println "Module: ${project.name} (${project.group}:${project.version})"
+        }
+    }
+}
+
+// 편의: 전체 빌드 task 정의
+task buildAll {
+    description = "Build all subprojects"
+    group = "build"
+    dependsOn subprojects.collect { it.tasks.matching { t -> t.name == 'build' } }
 }

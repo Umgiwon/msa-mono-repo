@@ -1,10 +1,10 @@
 rootProject.name = 'monorepo'
 
 // 공통 모듈
-include('common-module')
+include 'common-module'
 
 // API Gateway 모듈
-include('api-gateway')
+include 'api-gateway'
 
 // 각 서비스 모듈
-include('initial-api')
+include 'initial-api'
